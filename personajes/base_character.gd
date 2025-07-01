@@ -181,15 +181,68 @@ func process_collision(other_body):
 
 func change_to(new_type: String):
 	if new_type != emotion_type:
+		# Guardar mi tipo anterior para notificaciones
+		var old_type = emotion_type
+		
 		# Limpiar estados de hunting antes de cambiar tipo
 		clear_hunting_states()
 		
+		# Cambiar tipo
 		emotion_type = new_type
 		update_sprite()
 		update_collision_layers()
 		
+		# IMPORTANTE: Notificar a TODOS los personajes cercanos sobre mi transformación
+		notify_transformation_to_nearby_characters()
+		
 		# Forzar re-evaluación de todas las entidades en el área de detección
 		refresh_detection_area()
+
+func notify_transformation_to_nearby_characters():
+	# Obtener todos los personajes que pueden verme (dentro de sus áreas de detección)
+	var all_characters = get_tree().get_nodes_in_group("characters")
+	
+	for character in all_characters:
+		if character != self and is_instance_valid(character):
+			# Verificar si estoy en el área de detección del otro personaje
+			var other_area = character.get_node("Area2D")
+			if other_area and other_area.overlaps_body(self):
+				# Notificar al otro personaje que debe re-evaluar si soy presa o cazador
+				if character.has_method("re_evaluate_character"):
+					character.re_evaluate_character(self)
+
+func re_evaluate_character(transformed_character):
+	# Llamado cuando otro personaje se transforma y necesito re-evaluar mi relación con él
+	var other_type = transformed_character.get_emotion_type()
+	
+	# Si actualmente lo estoy cazando pero ya no puedo cazarlo
+	if hunting_target == transformed_character and not can_hunt(other_type):
+		stop_hunting()
+	
+	# Si no estoy cazando y ahora puedo cazarlo
+	if not is_hunting and can_hunt(other_type):
+		hunting_target = transformed_character
+		is_hunting = true
+		
+		# Notificar al otro que está siendo cazado
+		if transformed_character.has_method("add_hunter"):
+			transformed_character.add_hunter(self)
+		
+		update_speed()
+	
+	# Si ahora puede cazarme
+	if is_hunted_by(other_type):
+		# IMPORTANTE: Agregar directamente como cazador
+		# No esperar confirmación - debo huir de cualquier cazador cercano
+		add_hunter(transformed_character)
+		
+		# También notificar por si quiere cazarme activamente
+		if transformed_character.has_method("notify_prey_detected"):
+			transformed_character.notify_prey_detected(self)
+	
+	# Si ya no puede cazarme (pero antes sí)
+	elif transformed_character in hunters:
+		remove_hunter(transformed_character)
 
 func get_emotion_type() -> String:
 	return emotion_type
@@ -228,7 +281,11 @@ func _on_detection_area_entered(body):
 		
 		# Verificar si este tipo puede cazarme
 		elif is_hunted_by(other_type):
-			# Notificar al cazador que me encontró
+			# IMPORTANTE: Agregar directamente al cazador sin esperar confirmación
+			# Todas las presas deben huir de cualquier cazador cercano
+			add_hunter(body)
+			
+			# También notificar al cazador por si quiere cazarme
 			if body.has_method("notify_prey_detected"):
 				body.notify_prey_detected(self)
 
@@ -365,8 +422,12 @@ func refresh_detection_area():
 				update_speed()
 				break  # Solo cazar un objetivo a la vez
 			
-			# Si este tipo ahora puede cazarme, notificarle
+			# Si este tipo ahora puede cazarme
 			elif is_hunted_by(other_type):
+				# IMPORTANTE: Agregar directamente como cazador
+				add_hunter(body)
+				
+				# También notificar por si quiere cazarme
 				if body.has_method("notify_prey_detected"):
 					body.notify_prey_detected(self)
 
