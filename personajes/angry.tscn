@@ -1,12 +1,15 @@
-[gd_scene load_steps=4 format=3 uid="uid://bd7eqwp7c8b5r"]
+[gd_scene load_steps=5 format=3 uid="uid://bd7eqwp7c8b5r"]
 
-[ext_resource type="Texture2D" uid="uid://b0u0kfqrikn8m" path="res://sprites/emote_faceAngry.png" id="1_0hwbq"]
+[ext_resource type="Script" path="res://personajes/base_character.gd" id="1_8n4mp"]
+[ext_resource type="Texture2D" uid="uid://bbepgyiwhvlsk" path="res://sprites/emote_faceAngry.png" id="1_0hwbq"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_f8alv"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_0hwbq"]
 
 [node name="Angry" type="RigidBody2D"]
+script = ExtResource("1_8n4mp")
+emotion_type = "angry"
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 texture = ExtResource("1_0hwbq")

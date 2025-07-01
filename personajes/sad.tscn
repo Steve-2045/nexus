@@ -1,13 +1,16 @@
-[gd_scene load_steps=4 format=3 uid="uid://30k30ol6k1ui"]
+[gd_scene load_steps=5 format=3 uid="uid://30k30ol6k1ui"]
 
-[ext_resource type="Texture2D" uid="uid://b7ogxo33017se" path="res://sprites/emote_faceSad.png" id="1_g25le"]
+[ext_resource type="Script" path="res://personajes/base_character.gd" id="1_8n4mp"]
+[ext_resource type="Texture2D" uid="uid://dn2ginquy17eq" path="res://sprites/emote_faceSad.png" id="1_g25le"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_f8alv"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_g25le"]
 
 [node name="Sad" type="RigidBody2D"]
+script = ExtResource("1_8n4mp")
 scale = Vector2(0.994938, 1.01872)
+emotion_type = "sad"
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 texture = ExtResource("1_g25le")
