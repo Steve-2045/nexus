@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3 uid="uid://cxvk5qsrkrqxr"]
+
+[ext_resource type="Texture2D" uid="uid://vnmvvhnau1qc" path="res://sprites/emote_faceHappy.png" id="1_eyyqx"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_f8alv"]
+
+[node name="Happy" type="RigidBody2D"]
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("1_eyyqx")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+scale = Vector2(1.60383, 1.28944)
+shape = SubResource("CapsuleShape2D_f8alv")
