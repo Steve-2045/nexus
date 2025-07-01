@@ -67,8 +67,19 @@ func _physics_process(_delta):
 func maintain_constant_speed():
 	# Si está cazando, perseguir a la presa
 	if is_hunting and hunting_target and is_instance_valid(hunting_target):
-		var direction = (hunting_target.global_position - global_position).normalized()
-		linear_velocity = direction * current_speed
+		# Verificar si el objetivo aún es válido para cazar
+		var other_type = hunting_target.get_emotion_type()
+		if can_hunt(other_type):
+			var direction = (hunting_target.global_position - global_position).normalized()
+			linear_velocity = direction * current_speed
+		else:
+			# El objetivo ya no es válido, dejar de cazarlo
+			hunting_target = null
+			is_hunting = false
+			update_speed()
+			# Mantener velocidad constante en dirección actual
+			if linear_velocity.length() > 0:
+				linear_velocity = linear_velocity.normalized() * current_speed
 	else:
 		# Mantener velocidad constante en dirección actual
 		if linear_velocity.length() > 0:
@@ -129,13 +140,10 @@ func _on_body_entered(body):
 func process_collision(other_body):
 	var other_type = other_body.get_emotion_type()
 	
-	# ANGRY (Papel) lógica:
-	# - Vence a HAPPY (Piedra)
-	# - Pierde contra SAD (Tijera)
-	
-	if other_type == "happy":
-		# Angry vence a Happy - Solo el ganador transforma
-		other_body.change_to("angry")
+	# Lógica dinámica de transformación basada en piedra-papel-tijera
+	if can_hunt(other_type):
+		# Solo el ganador transforma al perdedor
+		other_body.change_to(emotion_type)
 
 
 func change_to(new_type: String):
@@ -188,8 +196,14 @@ func _on_detection_area_exited(body):
 		update_speed()
 
 func can_hunt(other_type: String) -> bool:
-	# ANGRY (Papel) puede cazar HAPPY (Piedra)
-	return other_type == "happy"
+	# Lógica dinámica basada en el tipo actual
+	if emotion_type == "happy":  # Piedra
+		return other_type == "sad"  # Vence a Tijera
+	elif emotion_type == "angry":  # Papel
+		return other_type == "happy"  # Vence a Piedra
+	elif emotion_type == "sad":  # Tijera
+		return other_type == "angry"  # Vence a Papel
+	return false
 
 func _being_hunted_by(hunter):
 	if not hunters.has(hunter):
