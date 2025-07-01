@@ -117,38 +117,14 @@ func process_collision(other_body):
 	# - Pierde contra ANGRY (Papel)
 	
 	if other_type == "sad":
-		# Happy vence a Sad
+		# Happy vence a Sad - Solo el ganador transforma
 		other_body.change_to("happy")
-	elif other_type == "angry":
-		# Angry vence a Happy
-		change_to("angry")
-	
-	# Efecto rebote después de colisión
-	apply_collision_bounce(other_body)
 
-func apply_collision_bounce(other_body):
-	# Calcular dirección de separación
-	var separation = (global_position - other_body.global_position).normalized()
-	
-	# Aplicar nueva dirección manteniendo velocidad constante
-	linear_velocity = separation * current_speed
-	
-	# Añadir pequeña variación aleatoria a la dirección
-	var random_angle = randf_range(-0.2, 0.2)  # ±11 grados
-	linear_velocity = linear_velocity.rotated(random_angle)
-	
-	# Asegurar velocidad constante después del rebote
-	linear_velocity = linear_velocity.normalized() * current_speed
 
 func change_to(new_type: String):
 	if new_type != emotion_type:
 		emotion_type = new_type
 		update_sprite()
-		
-		# Mantener la misma velocidad, solo cambiar dirección ligeramente
-		var random_angle = randf_range(-0.1, 0.1)  # Pequeña variación
-		linear_velocity = linear_velocity.rotated(random_angle)
-		linear_velocity = linear_velocity.normalized() * current_speed
 
 func get_emotion_type() -> String:
 	return emotion_type
