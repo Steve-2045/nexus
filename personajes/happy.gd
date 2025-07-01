@@ -4,8 +4,8 @@ extends RigidBody2D
 var emotion_type = "happy"
 
 # Variables de configuración
-@export var speed_min: float = 150.0
-@export var speed_max: float = 250.0
+@export var speed_min: float = 75.0
+@export var speed_max: float = 125.0
 var current_speed: float  # Velocidad constante
 var base_speed: float     # Velocidad base sin modificadores
 
@@ -50,6 +50,9 @@ func _ready():
 	
 	# Configurar velocidad inicial aleatoria y constante
 	set_random_velocity()
+	
+	# Configurar collision layers iniciales
+	update_collision_layers()
 	
 	# Obtener límites de pantalla
 	call_deferred("update_screen_bounds")
@@ -150,6 +153,7 @@ func change_to(new_type: String):
 	if new_type != emotion_type:
 		emotion_type = new_type
 		update_sprite()
+		update_collision_layers()
 
 func get_emotion_type() -> String:
 	return emotion_type
@@ -246,3 +250,23 @@ func load_textures():
 		angry_texture = load(angry_path)
 	else:
 		push_warning("No se encontró: " + angry_path)
+
+func update_collision_layers():
+	# Definir layers: 1=Happy(bit 0), 2=Angry(bit 1), 4=Sad(bit 2)
+	# Cada tipo solo colisiona con sus presas
+	
+	if emotion_type == "happy":  # Piedra
+		collision_layer = 1  # Soy bit 0 (valor 1)
+		collision_mask = 4   # Solo detecto bit 2 (Sad, valor 4)
+		$Area2D.collision_layer = 1
+		$Area2D.collision_mask = 4
+	elif emotion_type == "angry":  # Papel
+		collision_layer = 2  # Soy bit 1 (valor 2)
+		collision_mask = 1   # Solo detecto bit 0 (Happy, valor 1)
+		$Area2D.collision_layer = 2
+		$Area2D.collision_mask = 1
+	elif emotion_type == "sad":  # Tijera
+		collision_layer = 4  # Soy bit 2 (valor 4)
+		collision_mask = 2   # Solo detecto bit 1 (Angry, valor 2)
+		$Area2D.collision_layer = 4
+		$Area2D.collision_mask = 2
