@@ -7,6 +7,13 @@ var emotion_type = "happy"
 @export var speed_min: float = 150.0
 @export var speed_max: float = 250.0
 var current_speed: float  # Velocidad constante
+var base_speed: float     # Velocidad base sin modificadores
+
+# Variables de caza
+var is_hunting = false
+var is_being_hunted = false
+var hunting_target = null
+var hunters = []  # Lista de quien me está cazando
 
 # Referencias a las texturas
 @export var happy_texture: Texture
@@ -33,6 +40,10 @@ func _ready():
 	# Conectar señales
 	body_entered.connect(_on_body_entered)
 	
+	# Conectar señales del Area2D para detección de caza
+	$Area2D.body_entered.connect(_on_detection_area_entered)
+	$Area2D.body_exited.connect(_on_detection_area_exited)
+	
 	# Cargar texturas
 	load_textures()
 	update_sprite()
@@ -54,9 +65,14 @@ func _physics_process(_delta):
 	maintain_constant_speed()
 
 func maintain_constant_speed():
-	# Asegurar que la velocidad siempre sea constante
-	if linear_velocity.length() > 0:
-		linear_velocity = linear_velocity.normalized() * current_speed
+	# Si está cazando, perseguir a la presa
+	if is_hunting and hunting_target and is_instance_valid(hunting_target):
+		var direction = (hunting_target.global_position - global_position).normalized()
+		linear_velocity = direction * current_speed
+	else:
+		# Mantener velocidad constante en dirección actual
+		if linear_velocity.length() > 0:
+			linear_velocity = linear_velocity.normalized() * current_speed
 
 func update_screen_bounds():
 	var viewport = get_viewport()
@@ -64,8 +80,9 @@ func update_screen_bounds():
 		screen_bounds = viewport.get_visible_rect()
 
 func set_random_velocity():
-	# Establecer velocidad constante
-	current_speed = randf_range(speed_min, speed_max)
+	# Establecer velocidad base constante
+	base_speed = randf_range(speed_min, speed_max)
+	current_speed = base_speed
 	
 	# Dirección aleatoria
 	var angle = randf() * TAU
@@ -143,6 +160,57 @@ func update_sprite():
 		"angry":
 			if angry_texture:
 				sprite.texture = angry_texture
+
+func _on_detection_area_entered(body):
+	if body.has_method("get_emotion_type") and body != self:
+		var other_type = body.get_emotion_type()
+		
+		# Solo cazar si puedo vencer a este tipo
+		if can_hunt(other_type):
+			hunting_target = body
+			is_hunting = true
+			
+			# Notificar al otro que está siendo cazado
+			if body.has_method("_being_hunted_by"):
+				body._being_hunted_by(self)
+			
+			update_speed()
+
+func _on_detection_area_exited(body):
+	if body == hunting_target:
+		hunting_target = null
+		is_hunting = false
+		
+		# Notificar al otro que ya no lo cazo
+		if body.has_method("_no_longer_hunted_by"):
+			body._no_longer_hunted_by(self)
+		
+		update_speed()
+
+func can_hunt(other_type: String) -> bool:
+	# HAPPY (Piedra) puede cazar SAD (Tijera)
+	return other_type == "sad"
+
+func _being_hunted_by(hunter):
+	if not hunters.has(hunter):
+		hunters.append(hunter)
+		is_being_hunted = true
+		update_speed()
+
+func _no_longer_hunted_by(hunter):
+	hunters.erase(hunter)
+	is_being_hunted = (hunters.size() > 0)
+	update_speed()
+
+func update_speed():
+	if is_hunting and is_being_hunted:
+		current_speed = base_speed * 1.0  # Neutral
+	elif is_hunting:
+		current_speed = base_speed * 1.25  # Más rápido
+	elif is_being_hunted:
+		current_speed = base_speed * 0.75  # Más lento
+	else:
+		current_speed = base_speed  # Normal
 
 func load_textures():
 	# Cargar texturas con manejo de errores

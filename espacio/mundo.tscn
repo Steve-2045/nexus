@@ -16,10 +16,34 @@ position = Vector2(576, 324)
 position = Vector2(579, 534)
 script = ExtResource("2_5o1ci")
 
+[node name="Angry2" parent="." instance=ExtResource("1_1xg4q")]
+position = Vector2(579, 534)
+script = ExtResource("2_5o1ci")
+
+[node name="Angry3" parent="." instance=ExtResource("1_1xg4q")]
+position = Vector2(579, 534)
+script = ExtResource("2_5o1ci")
+
 [node name="Happy" parent="." instance=ExtResource("2_fawxr")]
 position = Vector2(41, 36)
 script = ExtResource("3_fawxr")
 
+[node name="Happy2" parent="." instance=ExtResource("2_fawxr")]
+position = Vector2(41, 36)
+script = ExtResource("3_fawxr")
+
+[node name="Happy3" parent="." instance=ExtResource("2_fawxr")]
+position = Vector2(41, 36)
+script = ExtResource("3_fawxr")
+
 [node name="Sad" parent="." instance=ExtResource("3_5o1ci")]
+position = Vector2(1082, 49)
+script = ExtResource("6_nfilq")
+
+[node name="Sad2" parent="." instance=ExtResource("3_5o1ci")]
+position = Vector2(1082, 49)
+script = ExtResource("6_nfilq")
+
+[node name="Sad3" parent="." instance=ExtResource("3_5o1ci")]
 position = Vector2(1082, 49)
 script = ExtResource("6_nfilq")
