@@ -15,6 +15,10 @@ var is_being_hunted = false
 var hunting_target = null
 var hunters = []  # Lista de quien me está cazando
 
+# Variables para el rebote
+var bounce_cooldown: float = 0.0  # Tiempo para respetar el rebote
+var bounce_direction: Vector2 = Vector2.ZERO  # Dirección del rebote
+
 # Referencias a las texturas
 @export var happy_texture: Texture
 @export var sad_texture: Texture  
@@ -60,7 +64,11 @@ func _ready():
 	
 	# Los límites se actualizarán cuando sea necesario
 
-func _physics_process(_delta):
+func _physics_process(delta):
+	# Actualizar cooldown del rebote
+	if bounce_cooldown > 0:
+		bounce_cooldown -= delta
+	
 	# Verificar colisiones con bordes (incluye actualización de límites)
 	check_screen_boundaries()
 	
@@ -68,6 +76,11 @@ func _physics_process(_delta):
 	maintain_constant_speed()
 
 func maintain_constant_speed():
+	# Si acabamos de rebotar, usar la dirección del rebote
+	if bounce_cooldown > 0 and bounce_direction != Vector2.ZERO:
+		linear_velocity = bounce_direction * current_speed
+		return
+	
 	# Si está cazando, perseguir a la presa
 	if is_hunting and hunting_target and is_instance_valid(hunting_target):
 		# Verificar si el objetivo aún es válido para cazar
@@ -163,6 +176,9 @@ func check_screen_boundaries():
 	# Si cambió la velocidad, normalizarla y aplicar velocidad constante
 	if velocity_changed:
 		linear_velocity = linear_velocity.normalized() * current_speed
+		# IMPORTANTE: Guardar la dirección del rebote y activar cooldown
+		bounce_direction = linear_velocity.normalized()
+		bounce_cooldown = 0.3  # Respetar el rebote por 0.3 segundos
 
 func _on_body_entered(body):
 	# Verificar que es otro objeto emoción
