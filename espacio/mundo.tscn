@@ -1,55 +1,22 @@
-[gd_scene load_steps=4 format=3 uid="uid://byyy6av4xv2fd"]
+[gd_scene load_steps=2 format=3 uid="uid://byyy6av4xv2fd"]
 
-[ext_resource type="PackedScene" uid="uid://bd7eqwp7c8b5r" path="res://personajes/angry.tscn" id="1_1xg4q"]
-[ext_resource type="PackedScene" uid="uid://cxvk5qsrkrqxr" path="res://personajes/happy.tscn" id="2_fawxr"]
-[ext_resource type="PackedScene" uid="uid://30k30ol6k1ui" path="res://personajes/sad.tscn" id="3_5o1ci"]
+[ext_resource type="Script" uid="uid://cg4eyqjqoxmcb" path="res://espacio/mundo.gd" id="1_0xm2p"]
 
 [node name="Node2D" type="Node2D"]
+script = ExtResource("1_0xm2p")
 
 [node name="Camera2D" type="Camera2D" parent="."]
 position = Vector2(576, 324)
 
-[node name="Angry" parent="." instance=ExtResource("1_1xg4q")]
-position = Vector2(579, 534)
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
 
-[node name="Angry2" parent="." instance=ExtResource("1_1xg4q")]
-position = Vector2(579, 534)
-
-[node name="Angry3" parent="." instance=ExtResource("1_1xg4q")]
-position = Vector2(579, 534)
-
-[node name="Angry4" parent="." instance=ExtResource("1_1xg4q")]
-position = Vector2(579, 534)
-
-[node name="Angry5" parent="." instance=ExtResource("1_1xg4q")]
-position = Vector2(579, 534)
-
-[node name="Happy" parent="." instance=ExtResource("2_fawxr")]
-position = Vector2(41, 36)
-
-[node name="Happy2" parent="." instance=ExtResource("2_fawxr")]
-position = Vector2(41, 36)
-
-[node name="Happy3" parent="." instance=ExtResource("2_fawxr")]
-position = Vector2(41, 36)
-
-[node name="Happy4" parent="." instance=ExtResource("2_fawxr")]
-position = Vector2(41, 36)
-
-[node name="Happy5" parent="." instance=ExtResource("2_fawxr")]
-position = Vector2(41, 36)
-
-[node name="Sad" parent="." instance=ExtResource("3_5o1ci")]
-position = Vector2(1082, 49)
-
-[node name="Sad2" parent="." instance=ExtResource("3_5o1ci")]
-position = Vector2(1082, 49)
-
-[node name="Sad3" parent="." instance=ExtResource("3_5o1ci")]
-position = Vector2(1082, 49)
-
-[node name="Sad4" parent="." instance=ExtResource("3_5o1ci")]
-position = Vector2(1082, 49)
-
-[node name="Sad5" parent="." instance=ExtResource("3_5o1ci")]
-position = Vector2(1082, 49)
+[node name="reset" type="Button" parent="CanvasLayer"]
+anchors_preset = -1
+anchor_left = 0.497
+anchor_top = 0.494
+anchor_right = 0.503
+anchor_bottom = 0.506
+offset_left = -580.544
+offset_top = -328.112
+offset_right = -579.456
+offset_bottom = -327.888

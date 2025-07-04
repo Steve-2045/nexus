@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3 uid="uid://30k30ol6k1ui"]
 
-[ext_resource type="Script" path="res://personajes/base_character.gd" id="1_8n4mp"]
+[ext_resource type="Script" uid="uid://cf5fs4vxu60w5" path="res://personajes/base_character.gd" id="1_8n4mp"]
 [ext_resource type="Texture2D" uid="uid://dn2ginquy17eq" path="res://sprites/emote_faceSad.png" id="1_g25le"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_f8alv"]
@@ -8,8 +8,8 @@
 [sub_resource type="CircleShape2D" id="CircleShape2D_g25le"]
 
 [node name="Sad" type="RigidBody2D"]
-script = ExtResource("1_8n4mp")
 scale = Vector2(0.994938, 1.01872)
+script = ExtResource("1_8n4mp")
 emotion_type = "sad"
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
@@ -22,5 +22,5 @@ shape = SubResource("CapsuleShape2D_f8alv")
 [node name="Area2D" type="Area2D" parent="."]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
-scale = Vector2(10, 10)
+scale = Vector2(40, 40)
 shape = SubResource("CircleShape2D_g25le")

@@ -1,159 +1,233 @@
 extends RigidBody2D
 class_name BaseCharacter
 
+## Rock-Paper-Scissors Game Entity
+## This class represents a character that can be one of three emotions:
+## - Happy (Rock): Beats Sad (Scissors)
+## - Angry (Paper): Beats Happy (Rock)  
+## - Sad (Scissors): Beats Angry (Paper)
+
+# ============================================================================
+# EXPORTED PROPERTIES
+# ============================================================================
+
+## The current emotion type of this character
 @export_enum("happy", "angry", "sad") var emotion_type: String = "happy"
 
-# Variables de configuración
-@export var speed_min: float = 75.0
-@export var speed_max: float = 125.0
-var current_speed: float  # Velocidad constante
-var base_speed: float     # Velocidad base sin modificadores
+## Standard movement speed for all characters
+@export var standard_speed: float = 100.0
 
-# Variables de caza
-var is_hunting = false
-var is_being_hunted = false
-var hunting_target = null
-var hunters = []  # Lista de quien me está cazando
-
-# Variables para el rebote
-var bounce_cooldown: float = 0.0  # Tiempo para respetar el rebote
-var bounce_direction: Vector2 = Vector2.ZERO  # Dirección del rebote
-
-# Referencias a las texturas
+## Texture resources for each emotion state
 @export var happy_texture: Texture
 @export var sad_texture: Texture  
 @export var angry_texture: Texture
 
-# Variables internas
+# ============================================================================
+# MOVEMENT & PHYSICS VARIABLES
+# ============================================================================
+
+## Current actual speed (with hunting modifiers applied)
+var current_speed: float
+## Base speed without any modifiers
+var base_speed: float
+
+## Screen boundary rectangle for collision detection
 var screen_bounds: Rect2
-var sprite: Sprite2D
+## Cached sprite size for performance optimization
 var cached_sprite_size: Vector2
 
+# ============================================================================
+# BOUNCING MECHANICS
+# ============================================================================
+
+## Cooldown timer to respect wall bounce direction
+var bounce_cooldown: float = 0.0
+## Direction vector for wall bouncing
+var bounce_direction: Vector2 = Vector2.ZERO
+
+# ============================================================================
+# HUNTING SYSTEM VARIABLES
+# ============================================================================
+
+## Whether this character is currently hunting another
+var is_hunting: bool = false
+## Whether this character is being hunted by others
+var is_being_hunted: bool = false
+## Reference to the character being hunted
+var hunting_target: BaseCharacter = null
+## Array of characters hunting this one
+var hunters: Array[BaseCharacter] = []
+
+# ============================================================================
+# INTERNAL REFERENCES
+# ============================================================================
+
+## Reference to the sprite node
+var sprite: Sprite2D
+
+# ============================================================================
+# INITIALIZATION
+# ============================================================================
+
 func _ready():
-	# Añadir al grupo para poder encontrar todas las entidades
+	# Add to character group for global reference
 	add_to_group("characters")
 	
-	# Configurar detección de colisiones
+	# Configure collision detection for transformation events
 	contact_monitor = true
 	max_contacts_reported = 10
 	
-	# Configuración física
-	mass = 1.0
-	gravity_scale = 0  # Sin gravedad
-	lock_rotation = true  # IMPORTANTE: Evita que el sprite rote
+	# Setup physics properties
+	_setup_physics()
 	
-	# Obtener referencia al sprite
+	# Get sprite reference
 	sprite = $Sprite2D
 	
-	# Conectar señales
-	body_entered.connect(_on_body_entered)
+	# Connect collision signals
+	_connect_signals()
 	
-	# Conectar señales del Area2D para detección de caza
-	$Area2D.body_entered.connect(_on_detection_area_entered)
-	$Area2D.body_exited.connect(_on_detection_area_exited)
-	
-	# Cargar texturas
+	# Initialize visual appearance
 	load_textures()
 	update_sprite()
 	
-	# Configurar velocidad inicial aleatoria y constante
+	# Setup initial movement
 	set_random_velocity()
 	
-	# Configurar collision layers iniciales
+	# Configure collision layers for selective interaction
 	update_collision_layers()
+
+## Configure physics properties for the character
+func _setup_physics():
+	mass = 1.0
+	gravity_scale = 0.0  # Disable gravity for 2D top-down movement
+	lock_rotation = true  # Prevent sprite rotation during collisions
+
+## Connect all necessary signals for collision detection
+func _connect_signals():
+	# RigidBody2D collision for transformation events
+	body_entered.connect(_on_body_entered)
 	
-	# Los límites se actualizarán cuando sea necesario
+	# Area2D detection for hunting behavior
+	$Area2D.body_entered.connect(_on_detection_area_entered)
+	$Area2D.body_exited.connect(_on_detection_area_exited)
+
+# ============================================================================
+# PHYSICS & MOVEMENT PROCESSING
+# ============================================================================
 
 func _physics_process(delta):
-	# Actualizar cooldown del rebote
+	# Update bounce cooldown timer
 	if bounce_cooldown > 0:
 		bounce_cooldown -= delta
 	
-	# Verificar colisiones con bordes (incluye actualización de límites)
+	# Handle screen boundary collisions
 	check_screen_boundaries()
 	
-	# IMPORTANTE: Mantener velocidad constante
+	# Maintain constant movement speed
 	maintain_constant_speed()
 
+## Maintains constant movement speed while handling hunting/fleeing behaviors
 func maintain_constant_speed():
-	# Si acabamos de rebotar, usar la dirección del rebote
+	# Prioritize bounce direction during cooldown period
 	if bounce_cooldown > 0 and bounce_direction != Vector2.ZERO:
 		linear_velocity = bounce_direction * current_speed
 		return
 	
-	# Si está cazando, perseguir a la presa
+	# Hunting behavior: pursue target
 	if is_hunting and hunting_target and is_instance_valid(hunting_target):
-		# Verificar si el objetivo aún es válido para cazar
 		var other_type = hunting_target.get_emotion_type()
 		if can_hunt(other_type):
 			var direction = (hunting_target.global_position - global_position).normalized()
 			linear_velocity = direction * current_speed
 		else:
-			# El objetivo ya no es válido, dejar de cazarlo
+			# Target is no longer valid, stop hunting
 			stop_hunting()
-	# Si está siendo cazado, huir del cazador más cercano
+	
+	# Fleeing behavior: escape from closest hunter
 	elif is_being_hunted and hunters.size() > 0:
-		var closest_hunter = null
-		var closest_distance = INF
-		
-		# Encontrar el cazador más cercano válido
-		for hunter in hunters:
-			if is_instance_valid(hunter):
-				var distance = global_position.distance_to(hunter.global_position)
-				if distance < closest_distance:
-					closest_distance = distance
-					closest_hunter = hunter
+		var closest_hunter = _find_closest_valid_hunter()
 		
 		if closest_hunter:
-			# Huir en dirección opuesta al cazador más cercano
+			# Flee in opposite direction from closest hunter
 			var flee_direction = (global_position - closest_hunter.global_position).normalized()
 			linear_velocity = flee_direction * current_speed
 		else:
-			# Limpiar cazadores inválidos
-			hunters = hunters.filter(func(h): return is_instance_valid(h))
-			is_being_hunted = hunters.size() > 0
-			update_speed()
-			# Mantener velocidad actual
-			if linear_velocity.length() > 0:
-				linear_velocity = linear_velocity.normalized() * current_speed
+			# Clean up invalid hunters and maintain current movement
+			_cleanup_invalid_hunters()
+			_maintain_current_movement()
 	else:
-		# Mantener velocidad constante en dirección actual
-		if linear_velocity.length() > 0:
-			linear_velocity = linear_velocity.normalized() * current_speed
-		else:
-			# Si por alguna razón la velocidad es 0, establecer una nueva dirección
-			set_random_velocity()
+		# Normal movement: maintain current direction and speed
+		_maintain_current_movement()
 
+## Find the closest valid hunter from the hunters array
+func _find_closest_valid_hunter() -> BaseCharacter:
+	var closest_hunter: BaseCharacter = null
+	var closest_distance: float = INF
+	
+	for hunter in hunters:
+		if is_instance_valid(hunter):
+			var distance = global_position.distance_to(hunter.global_position)
+			if distance < closest_distance:
+				closest_distance = distance
+				closest_hunter = hunter
+	
+	return closest_hunter
+
+## Remove invalid hunters from the hunters array
+func _cleanup_invalid_hunters():
+	hunters = hunters.filter(func(h): return is_instance_valid(h))
+	is_being_hunted = hunters.size() > 0
+	update_speed()
+
+## Maintain current movement or set random direction if stopped
+func _maintain_current_movement():
+	if linear_velocity.length() > 0:
+		linear_velocity = linear_velocity.normalized() * current_speed
+	else:
+		# If velocity is zero, set a new random direction
+		set_random_velocity()
+
+# ============================================================================
+# MOVEMENT SETUP & UTILITIES
+# ============================================================================
+
+## Update screen boundaries from viewport
 func update_screen_bounds():
 	var viewport = get_viewport()
 	if viewport:
 		screen_bounds = viewport.get_visible_rect()
 
+## Set initial random velocity and standard speed
 func set_random_velocity():
-	# Establecer velocidad base constante
-	base_speed = randf_range(speed_min, speed_max)
+	# Set standard speed for all characters
+	base_speed = standard_speed
 	current_speed = base_speed
 	
-	# Dirección aleatoria
+	# Set random direction
 	var angle = randf() * TAU
 	linear_velocity = Vector2(cos(angle), sin(angle)) * current_speed
 
+# ============================================================================
+# SCREEN BOUNDARY COLLISION
+# ============================================================================
+
+## Check and handle collisions with screen boundaries
 func check_screen_boundaries():
-	# Actualizar límites solo si es necesario
+	# Update screen bounds if not initialized
 	if screen_bounds.size == Vector2.ZERO:
 		update_screen_bounds()
 	
 	var pos = global_position
 	var vel = linear_velocity
 	
-	# Usar sprite size cacheado para mejor rendimiento
+	# Cache sprite size for performance optimization
 	if cached_sprite_size == Vector2.ZERO and sprite and sprite.texture:
 		cached_sprite_size = sprite.texture.get_size() * sprite.scale
 	var sprite_size = cached_sprite_size if cached_sprite_size != Vector2.ZERO else Vector2(50, 50)
 	
 	var velocity_changed = false
 	
-	# Rebote horizontal - solo cambiar dirección, mantener velocidad
+	# Handle horizontal boundaries
 	if pos.x <= sprite_size.x/2 and vel.x < 0:
 		linear_velocity.x = abs(vel.x)
 		global_position.x = sprite_size.x/2
@@ -163,7 +237,7 @@ func check_screen_boundaries():
 		global_position.x = screen_bounds.size.x - sprite_size.x/2
 		velocity_changed = true
 	
-	# Rebote vertical - solo cambiar dirección, mantener velocidad
+	# Handle vertical boundaries
 	if pos.y <= sprite_size.y/2 and vel.y < 0:
 		linear_velocity.y = abs(vel.y)
 		global_position.y = sprite_size.y/2
@@ -173,96 +247,114 @@ func check_screen_boundaries():
 		global_position.y = screen_bounds.size.y - sprite_size.y/2
 		velocity_changed = true
 	
-	# Si cambió la velocidad, normalizarla y aplicar velocidad constante
+	# Apply bounce effect if velocity changed
 	if velocity_changed:
 		linear_velocity = linear_velocity.normalized() * current_speed
-		# IMPORTANTE: Guardar la dirección del rebote y activar cooldown
 		bounce_direction = linear_velocity.normalized()
-		bounce_cooldown = 0.3  # Respetar el rebote por 0.3 segundos
+		bounce_cooldown = 0.3  # Respect bounce direction for 0.3 seconds
 
+# ============================================================================
+# COLLISION & TRANSFORMATION SYSTEM
+# ============================================================================
+
+## Handle collision with another character (transformation events)
 func _on_body_entered(body):
-	# Verificar que es otro objeto emoción
+	# Verify it's another emotion character
 	if body.has_method("get_emotion_type") and body != self:
 		var other_type = body.get_emotion_type()
 		if other_type != emotion_type:
 			process_collision(body)
 
+## Process collision logic and apply rock-paper-scissors rules
 func process_collision(other_body):
 	var other_type = other_body.get_emotion_type()
 	
-	# Lógica dinámica de transformación basada en piedra-papel-tijera
+	# Apply rock-paper-scissors transformation rules
 	if can_hunt(other_type):
-		# Solo el ganador transforma al perdedor
+		# Winner transforms the loser
 		other_body.change_to(emotion_type)
 
+## Transform this character to a new emotion type
 func change_to(new_type: String):
 	if new_type != emotion_type:
-		# Guardar mi tipo anterior para notificaciones
-		var old_type = emotion_type
-		
-		# Limpiar estados de hunting antes de cambiar tipo
+		# Clear all hunting states before transformation
 		clear_hunting_states()
 		
-		# Cambiar tipo
+		# Apply transformation
 		emotion_type = new_type
 		update_sprite()
 		update_collision_layers()
 		
-		# IMPORTANTE: Notificar a TODOS los personajes cercanos sobre mi transformación
+		# Notify nearby characters about the transformation
 		notify_transformation_to_nearby_characters()
 		
-		# Forzar re-evaluación de todas las entidades en el área de detección
+		# Force re-evaluation of all entities in detection area
 		refresh_detection_area()
 
+# ============================================================================
+# TRANSFORMATION NOTIFICATION SYSTEM
+# ============================================================================
+
+## Notify nearby characters about this character's transformation
 func notify_transformation_to_nearby_characters():
-	# Obtener todos los personajes que pueden verme (dentro de sus áreas de detección)
+	# Get all characters that can see me (within their detection areas)
 	var all_characters = get_tree().get_nodes_in_group("characters")
 	
 	for character in all_characters:
 		if character != self and is_instance_valid(character):
-			# Verificar si estoy en el área de detección del otro personaje
+			# Check if I'm within the other character's detection area
 			var other_area = character.get_node("Area2D")
 			if other_area and other_area.overlaps_body(self):
-				# Notificar al otro personaje que debe re-evaluar si soy presa o cazador
+				# Notify the other character to re-evaluate our relationship
 				if character.has_method("re_evaluate_character"):
 					character.re_evaluate_character(self)
 
+## Re-evaluate relationship with a character that just transformed
 func re_evaluate_character(transformed_character):
-	# Llamado cuando otro personaje se transforma y necesito re-evaluar mi relación con él
+	# Called when another character transforms and I need to re-evaluate our relationship
 	var other_type = transformed_character.get_emotion_type()
 	
-	# Si actualmente lo estoy cazando pero ya no puedo cazarlo
+	# If I'm currently hunting them but can no longer hunt them
 	if hunting_target == transformed_character and not can_hunt(other_type):
 		stop_hunting()
 	
-	# Si no estoy cazando y ahora puedo cazarlo
+	# If I'm not hunting and can now hunt them
 	if not is_hunting and can_hunt(other_type):
 		hunting_target = transformed_character
 		is_hunting = true
 		
-		# Notificar al otro que está siendo cazado
+		# Notify the other character that it's being hunted
 		if transformed_character.has_method("add_hunter"):
 			transformed_character.add_hunter(self)
 		
 		update_speed()
 	
-	# Si ahora puede cazarme
+	# If they can now hunt me
 	if is_hunted_by(other_type):
-		# IMPORTANTE: Agregar directamente como cazador
-		# No esperar confirmación - debo huir de cualquier cazador cercano
+		# Add them as a hunter immediately - must flee from any nearby hunters
 		add_hunter(transformed_character)
 		
-		# También notificar por si quiere cazarme activamente
+		# Also notify them in case they want to actively hunt me
 		if transformed_character.has_method("notify_prey_detected"):
 			transformed_character.notify_prey_detected(self)
 	
-	# Si ya no puede cazarme (pero antes sí)
+	# If they can no longer hunt me (but could before)
 	elif transformed_character in hunters:
 		remove_hunter(transformed_character)
 
+# ============================================================================
+# GETTER FUNCTIONS
+# ============================================================================
+
+## Get the current emotion type of this character
 func get_emotion_type() -> String:
 	return emotion_type
 
+# ============================================================================
+# VISUAL UPDATE SYSTEM
+# ============================================================================
+
+## Update sprite texture based on current emotion type
 func update_sprite():
 	if not sprite:
 		return
@@ -278,44 +370,54 @@ func update_sprite():
 			if angry_texture:
 				sprite.texture = angry_texture
 
+# ============================================================================
+# DETECTION AREA SIGNAL HANDLERS
+# ============================================================================
+
+## Handle when another character enters the detection area
 func _on_detection_area_entered(body):
 	if body.has_method("get_emotion_type") and body != self:
 		var other_type = body.get_emotion_type()
 		
-		# Verificar si puedo cazar a este tipo
+		# Check if I can hunt this type
 		if can_hunt(other_type):
-			# Solo cazar si no estoy cazando a nadie más
+			# Only hunt if not already hunting someone else
 			if not is_hunting:
 				hunting_target = body
 				is_hunting = true
 				
-				# Notificar al otro que está siendo cazado
+				# Notify the other character that it's being hunted
 				if body.has_method("add_hunter"):
 					body.add_hunter(self)
 				
 				update_speed()
 		
-		# Verificar si este tipo puede cazarme
+		# Check if this type can hunt me
 		elif is_hunted_by(other_type):
-			# IMPORTANTE: Agregar directamente al cazador sin esperar confirmación
-			# Todas las presas deben huir de cualquier cazador cercano
+			# Add them as a hunter immediately - all prey must flee from nearby hunters
 			add_hunter(body)
 			
-			# También notificar al cazador por si quiere cazarme
+			# Also notify the hunter in case they want to hunt me
 			if body.has_method("notify_prey_detected"):
 				body.notify_prey_detected(self)
 
+## Handle when another character exits the detection area
 func _on_detection_area_exited(body):
 	if body == hunting_target:
 		stop_hunting()
 	
-	# Si era un cazador que salió del área, ya no necesito huir de él
+	# If it was a hunter that left the area, no longer need to flee from it
 	if body in hunters:
 		remove_hunter(body)
 
+# ============================================================================
+# HUNTING MANAGEMENT FUNCTIONS
+# ============================================================================
+
+## Stop hunting the current target
 func stop_hunting():
 	if hunting_target and is_instance_valid(hunting_target):
-		# Notificar a la presa que ya no la cazo
+		# Notify the prey that I'm no longer hunting it
 		if hunting_target.has_method("remove_hunter"):
 			hunting_target.remove_hunter(self)
 	
@@ -323,57 +425,79 @@ func stop_hunting():
 	is_hunting = false
 	update_speed()
 
+# ============================================================================
+# GAME LOGIC FUNCTIONS (Rock-Paper-Scissors Rules)
+# ============================================================================
+
+## Check if this character can hunt the other type
 func can_hunt(other_type: String) -> bool:
-	# Lógica dinámica basada en el tipo actual
+	# Rock-paper-scissors logic based on current type
 	match emotion_type:
-		"happy":  # Piedra
-			return other_type == "sad"  # Vence a Tijera
-		"angry":  # Papel
-			return other_type == "happy"  # Vence a Piedra
-		"sad":  # Tijera
-			return other_type == "angry"  # Vence a Papel
+		"happy":  # Rock
+			return other_type == "sad"  # Rock beats Scissors
+		"angry":  # Paper
+			return other_type == "happy"  # Paper beats Rock
+		"sad":  # Scissors
+			return other_type == "angry"  # Scissors beats Paper
 	return false
 
+## Check if this character is hunted by the other type
 func is_hunted_by(other_type: String) -> bool:
-	# Verificar si soy cazado por este tipo
+	# Check if I'm prey to this type
 	match emotion_type:
-		"happy":  # Piedra
-			return other_type == "angry"  # Es cazado por Papel
-		"angry":  # Papel
-			return other_type == "sad"  # Es cazado por Tijera
-		"sad":  # Tijera
-			return other_type == "happy"  # Es cazado por Piedra
+		"happy":  # Rock
+			return other_type == "angry"  # Rock is beaten by Paper
+		"angry":  # Paper
+			return other_type == "sad"  # Paper is beaten by Scissors
+		"sad":  # Scissors
+			return other_type == "happy"  # Scissors is beaten by Rock
 	return false
 
+# ============================================================================
+# HUNTER/PREY RELATIONSHIP MANAGEMENT
+# ============================================================================
+
+## Add a hunter to the hunters list
 func add_hunter(hunter):
 	if not hunter in hunters:
 		hunters.append(hunter)
 		is_being_hunted = true
 		update_speed()
 
+## Remove a hunter from the hunters list
 func remove_hunter(hunter):
 	hunters.erase(hunter)
 	is_being_hunted = hunters.size() > 0
 	update_speed()
 
+## Called when a prey is detected in my area
 func notify_prey_detected(prey):
-	# Llamado cuando detecto una presa en mi área
 	if not is_hunting and can_hunt(prey.get_emotion_type()):
 		hunting_target = prey
 		is_hunting = true
 		prey.add_hunter(self)
 		update_speed()
 
+# ============================================================================
+# SPEED MODIFICATION SYSTEM
+# ============================================================================
+
+## Update movement speed based on hunting/fleeing state
 func update_speed():
 	if is_hunting and is_being_hunted:
-		current_speed = base_speed * 1.0  # Neutral
+		current_speed = base_speed * 1.1  # Slight boost when both hunting and fleeing
 	elif is_hunting:
-		current_speed = base_speed * 1.25  # Más rápido cazando
+		current_speed = base_speed * 1.3  # Faster when hunting
 	elif is_being_hunted:
-		current_speed = base_speed * 0.75  # Más lento huyendo
+		current_speed = base_speed * 0.85  # Slightly slower when fleeing (mild panic effect)
 	else:
-		current_speed = base_speed  # Normal
+		current_speed = base_speed  # Normal speed
 
+# ============================================================================
+# RESOURCE LOADING SYSTEM
+# ============================================================================
+
+## Load emotion textures from the sprites directory
 func load_textures():
 	var texture_paths = {
 		"happy": "res://sprites/emote_faceHappy.png",
@@ -398,72 +522,82 @@ func load_textures():
 		else:
 			push_error("Texture file not found: " + path)
 
+# ============================================================================
+# STATE CLEANUP & UTILITY FUNCTIONS
+# ============================================================================
+
+## Clear all hunting states (used during transformation)
 func clear_hunting_states():
-	# Dejar de cazar
+	# Stop hunting current target
 	stop_hunting()
 	
-	# Notificar a todos los cazadores que ya no existo como presa
+	# Notify all hunters that I no longer exist as prey
 	for hunter in hunters:
 		if is_instance_valid(hunter) and hunter.has_method("notify_prey_lost"):
 			hunter.notify_prey_lost(self)
 	
-	# Limpiar todos los estados
+	# Clear all states
 	hunters.clear()
 	is_being_hunted = false
 	
-	# Resetear velocidad a normal
+	# Reset speed to normal
 	update_speed()
 
+## Called when my prey changed type or was destroyed
 func notify_prey_lost(prey):
-	# Llamado cuando mi presa cambió de tipo o fue destruida
 	if prey == hunting_target:
 		stop_hunting()
 
+## Re-evaluate all entities currently in the detection area
 func refresh_detection_area():
-	# Re-evaluar todas las entidades actualmente en el área de detección
 	var bodies_in_area = $Area2D.get_overlapping_bodies()
 	for body in bodies_in_area:
 		if body.has_method("get_emotion_type") and body != self:
 			var other_type = body.get_emotion_type()
 			
-			# Si ahora puedo cazar a este tipo, empezar a cazarlo
+			# If I can now hunt this type, start hunting it
 			if can_hunt(other_type) and not is_hunting:
 				hunting_target = body
 				is_hunting = true
 				
-				# Notificar al otro que está siendo cazado
+				# Notify the other character that it's being hunted
 				if body.has_method("add_hunter"):
 					body.add_hunter(self)
 				
 				update_speed()
-				break  # Solo cazar un objetivo a la vez
+				break  # Only hunt one target at a time
 			
-			# Si este tipo ahora puede cazarme
+			# If this type can now hunt me
 			elif is_hunted_by(other_type):
-				# IMPORTANTE: Agregar directamente como cazador
+				# Add them as a hunter immediately
 				add_hunter(body)
 				
-				# También notificar por si quiere cazarme
+				# Also notify them in case they want to hunt me
 				if body.has_method("notify_prey_detected"):
 					body.notify_prey_detected(self)
 
+# ============================================================================
+# COLLISION LAYER CONFIGURATION
+# ============================================================================
+
+## Configure collision layers for selective interaction between emotion types
 func update_collision_layers():
-	# Configurar las capas para detectar tanto presas como depredadores
+	# Configure layers to detect both prey and predators
 	# Layers: 1=Happy(bit 0), 2=Angry(bit 1), 4=Sad(bit 2)
 	
 	match emotion_type:
-		"happy":  # Piedra
-			collision_layer = 1  # Soy bit 0 (valor 1)
-			collision_mask = 4   # Detecto colisiones con Sad (mi presa)
+		"happy":  # Rock
+			collision_layer = 1  # I am bit 0 (value 1)
+			collision_mask = 4   # Detect collisions with Sad (my prey)
 			$Area2D.collision_layer = 1
-			$Area2D.collision_mask = 6  # Detecto Angry (mi cazador, bit 1) y Sad (mi presa, bit 2)
-		"angry":  # Papel
-			collision_layer = 2  # Soy bit 1 (valor 2)
-			collision_mask = 1   # Detecto colisiones con Happy (mi presa)
+			$Area2D.collision_mask = 6  # Detect Angry (my hunter, bit 1) and Sad (my prey, bit 2)
+		"angry":  # Paper
+			collision_layer = 2  # I am bit 1 (value 2)
+			collision_mask = 1   # Detect collisions with Happy (my prey)
 			$Area2D.collision_layer = 2
-			$Area2D.collision_mask = 5  # Detecto Happy (mi presa, bit 0) y Sad (mi cazador, bit 2)
-		"sad":  # Tijera
-			collision_layer = 4  # Soy bit 2 (valor 4)
-			collision_mask = 2   # Detecto colisiones con Angry (mi presa)
+			$Area2D.collision_mask = 5  # Detect Happy (my prey, bit 0) and Sad (my hunter, bit 2)
+		"sad":  # Scissors
+			collision_layer = 4  # I am bit 2 (value 4)
+			collision_mask = 2   # Detect collisions with Angry (my prey)
 			$Area2D.collision_layer = 4
-			$Area2D.collision_mask = 3  # Detecto Happy (mi cazador, bit 0) y Angry (mi presa, bit 1)
+			$Area2D.collision_mask = 3  # Detect Happy (my hunter, bit 0) and Angry (my prey, bit 1)

@@ -1,7 +1,7 @@
 [gd_scene load_steps=5 format=3 uid="uid://bd7eqwp7c8b5r"]
 
-[ext_resource type="Script" path="res://personajes/base_character.gd" id="1_8n4mp"]
 [ext_resource type="Texture2D" uid="uid://bbepgyiwhvlsk" path="res://sprites/emote_faceAngry.png" id="1_0hwbq"]
+[ext_resource type="Script" uid="uid://cf5fs4vxu60w5" path="res://personajes/base_character.gd" id="1_8n4mp"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_f8alv"]
 
@@ -21,5 +21,5 @@ shape = SubResource("CapsuleShape2D_f8alv")
 [node name="Area2D" type="Area2D" parent="."]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
-scale = Vector2(10, 10)
+scale = Vector2(40, 40)
 shape = SubResource("CircleShape2D_0hwbq")

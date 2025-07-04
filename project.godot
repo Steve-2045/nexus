@@ -14,3 +14,7 @@ config/name="nexus"
 run/main_scene="uid://byyy6av4xv2fd"
 config/features=PackedStringArray("4.4", "Forward Plus")
 config/icon="res://icon.svg"
+
+[rendering]
+
+environment/defaults/default_clear_color=Color(1, 1, 1, 1)
